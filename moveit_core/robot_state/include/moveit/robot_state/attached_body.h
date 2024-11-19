@@ -32,7 +32,7 @@
  *  POSSIBILITY OF SUCH DAMAGE.
  *********************************************************************/
 
-/* Author: Ioan Sucan */
+/* Author: Ioan Sucan, Tom Noble */
 
 #pragma once
 
@@ -98,6 +98,82 @@ public:
   const LinkModel* getAttachedLink() const
   {
     return parent_link_model_;
+  }
+
+  /** \brief Get the name of the body that this body is attached to */
+  const std::string& getParentBodyName() const
+  {
+    return parent_body_ ? parent_body_->getName() : "";
+  }
+
+  /** \brief Get the body that this body is attached to */
+  const AttachedBody* getParentBody() const
+  {
+    return parent_body_;
+  }
+
+  /** \brief Determines if this body is directly attached to a link */
+  const bool isRootBody() const
+  {
+    return parent_body_ == nullptr;
+  }
+
+  /** \brief Get the name of the body that is directly attached to a link */
+  const std::string& getRootBodyName() const
+  {
+    return getRootBody()->getName();
+  }
+
+  /** \brief Get the body that is directly attached to a link */
+  const AttachedBody* getRootBody() const
+  {
+    const body = this;
+    while(body->isRootBody())
+    {
+      body_ = parent_body_;
+    }
+    return body
+  }
+
+  /** \brief Get the names of all direct child bodies of this body */
+  const std::vector<std::string> getDirectChildBodyNames() const {
+    std::vector<std::string> names;
+    for (const auto* child : child_bodies_)
+    {
+      names.push_back(child->getName());
+    }
+    return names;
+  }
+
+  /** \brief Get all direct child bodies of this body */
+  const std::vector<AttachedBody*> getDirectChildBodies() const
+  {
+    return child_bodies_;
+  }
+
+  /** \brief Get the direct child body of this body with name `id` */
+  const AttachedBody* getDirectChildBody(const std::string& id) const {
+    return child_bodies_[id];
+  }
+
+  /** \brief Get the names of all child and subchild bodies of this body */
+  const std::vector<std::string> getDescendantBodyNames() const {
+    std::vector<std::string> names;
+    auto descendants = getDescendantBodies();
+    for (auto descendant : descendants) {
+      names.push_back(descendant->getName());
+    }
+    return names;
+  }
+
+  /** \brief Get the child and subchild bodies of this body */
+  const std::vector<AttachedBody*> getDescendantBodies() const {
+    std::vector<AttachedBody*> descendants;
+    for (auto child : child_bodies_) {
+      auto grandchildren = child->getDescendantBodies();
+      descendants.insert(descendants.begin(), descendants.end(), grandchildren);
+    }
+    return descendants;
   }
 
   /** \brief Get the shapes that make up this attached body */
@@ -203,8 +279,16 @@ public:
   void computeTransform(const Eigen::Isometry3d& parent_link_global_transform);
 
 private:
-  /** \brief The link that owns this attached body */
+  /** \brief For bodies attached directly to links, this is the link attached to.
+  For bodies with parent bodies, this is the link attached to the root body. */
   const LinkModel* parent_link_model_;
+
+  /** \brief The attached body that owns this one, if hierarchical.
+  If attached directly to a link, this is a nullptr */
+  const AttachedBody* parent_body_;
+
+  /** \brief Any bodies which are attached directly to this body */
+  std::map<std::string, AttachedBody*> child_bodies_;
 
   /** \brief string id for reference */
   std::string id_;
