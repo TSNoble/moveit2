@@ -48,6 +48,7 @@ AttachedBody::AttachedBody(const LinkModel* parent, const std::string& id, const
                            const trajectory_msgs::msg::JointTrajectory& detach_posture,
                            const FixedTransformsMap& subframe_poses)
   : parent_link_model_(parent)
+  , parent_body_(nullptr)
   , id_(id)
   , pose_(pose)
   , shapes_(shapes)
@@ -81,7 +82,82 @@ AttachedBody::AttachedBody(const LinkModel* parent, const std::string& id, const
   }
 }
 
+AttachedBody::AttachedBody(const AttachedBody* parent, const std::string& id, const Eigen::Isometry3d& pose,
+                           const std::vector<shapes::ShapeConstPtr>& shapes,
+                           const EigenSTL::vector_Isometry3d& shape_poses,
+                           const FixedTransformsMap& subframe_poses)
+  : parent_link_model_(parent->getRootBody()->getAttachedLink())
+  , parent_body_(parent)
+  , id_(id)
+  , pose_(pose)
+  , shapes_(shapes)
+  , shape_poses_(shape_poses)
+  , touch_links_(parent->getRootBody()->getTouchLinks())
+  , detach_posture_(parent->getRootBody()->getDetachPosture())
+  , subframe_poses_(subframe_poses)
+  , global_subframe_poses_(subframe_poses)
+{
+  ASSERT_ISOMETRY(pose)  // unsanitized input, could contain a non-isometry
+  for (const auto& t : shape_poses_)
+  {
+    ASSERT_ISOMETRY(t)  // unsanitized input, could contain a non-isometry
+  }
+  for (const auto& t : subframe_poses_)
+  {
+    ASSERT_ISOMETRY(t.second)  // unsanitized input, could contain a non-isometry
+  }
+
+  // Global poses are initialized to identity to allow efficient Isometry calculations
+  global_pose_.setIdentity();
+  global_collision_body_transforms_.resize(shape_poses.size());
+  for (Eigen::Isometry3d& global_collision_body_transform : global_collision_body_transforms_)
+    global_collision_body_transform.setIdentity();
+
+  shape_poses_in_link_frame_.clear();
+  shape_poses_in_link_frame_.reserve(shape_poses_.size());
+  for (const auto& shape_pose : shape_poses_)
+  {
+    shape_poses_in_link_frame_.push_back(pose_ * shape_pose);
+  }
+}
+
 AttachedBody::~AttachedBody() = default;
+
+  /** \brief Get the names of all direct child bodies of this body */
+  const std::vector<std::string> getDirectChildBodyNames() const {
+    std::vector<std::string> names;
+    for (const auto& [name, _] : child_bodies_)
+    {
+      names.push_back(name);
+    }
+    return names;
+  }
+
+  /** \brief Get all direct child bodies of this body */
+  const std::vector<std::string, AttachedBody*> getDirectChildBodies() const
+  {
+    return child_bodies_;
+  }
+
+  // /** \brief Get the names of all child and subchild bodies of this body */
+  // const std::vector<std::string> getDescendantBodyNames() const {
+  //   std::vector<std::string> names;
+  //   auto descendants = getDescendantBodies();
+  //   for (auto descendant : descendants) {
+  //     names.push_back(descendant->getName());
+  //   }
+  //   return names;
+  // }
+
+  /** \brief Get the child and subchild bodies of this body */
+  const std::vector<AttachedBody*> AttachedBody::getDescendantBodies() const {
+    std::vector<AttachedBody*> descendants;
+    for (auto child : child_bodies_) {
+      auto grandchildren = child->getDescendantBodies();
+      descendants.insert(descendants.begin(), descendants.end(), grandchildren);
+    }
+    return descendants;
+  }
 
 void AttachedBody::setScale(double scale)
 {

@@ -68,6 +68,15 @@ public:
                const std::set<std::string>& touch_links, const trajectory_msgs::msg::JointTrajectory& detach_posture,
                const moveit::core::FixedTransformsMap& subframe_poses = moveit::core::FixedTransformsMap());
 
+  /** \brief Construct an attached body with a specified \e parent body.
+   *
+   * The name of this body is \e id and it consists of \e shapes that attach to the link by the transforms
+   * \e shape_poses.
+   * The shape and subframe poses are relative to the \e pose, and \e pose is relative to the parent body. */
+  AttachedBody(const AttachedBody* parent, const std::string& id, const Eigen::Isometry3d& pose,
+               const std::vector<shapes::ShapeConstPtr>& shapes, const EigenSTL::vector_Isometry3d& shape_poses,
+               const moveit::core::FixedTransformsMap& subframe_poses = moveit::core::FixedTransformsMap());
+  
   ~AttachedBody();
 
   /** \brief Get the name of the attached body */
@@ -101,7 +110,7 @@ public:
   }
 
   /** \brief Get the name of the body that this body is attached to */
-  const std::string& getParentBodyName() const
+  const std::string getParentBodyName() const
   {
     return parent_body_ ? parent_body_->getName() : "";
   }
@@ -113,13 +122,13 @@ public:
   }
 
   /** \brief Determines if this body is directly attached to a link */
-  const bool isRootBody() const
+  bool isRootBody() const
   {
     return parent_body_ == nullptr;
   }
 
   /** \brief Get the name of the body that is directly attached to a link */
-  const std::string& getRootBodyName() const
+  const std::string getRootBodyName() const
   {
     return getRootBody()->getName();
   }
@@ -127,53 +136,27 @@ public:
   /** \brief Get the body that is directly attached to a link */
   const AttachedBody* getRootBody() const
   {
-    const body = this;
-    while(body->isRootBody())
-    {
-      body_ = parent_body_;
-    }
-    return body
+    auto body = this;
+    while(!(body->isRootBody())) {body = parent_body_; }
+    return body;
   }
 
   /** \brief Get the names of all direct child bodies of this body */
   const std::vector<std::string> getDirectChildBodyNames() const {
     std::vector<std::string> names;
-    for (const auto* child : child_bodies_)
+    for (const auto& [name, _] : child_bodies_)
     {
-      names.push_back(child->getName());
+      names.push_back(name);
     }
     return names;
   }
 
   /** \brief Get all direct child bodies of this body */
-  const std::vector<AttachedBody*> getDirectChildBodies() const
-  {
-    return child_bodies_;
-  }
+  const std::vector<std::string, AttachedBody*> getDirectChildBodies() const;
 
   /** \brief Get the direct child body of this body with name `id` */
   const AttachedBody* getDirectChildBody(const std::string& id) const {
-    return child_bodies_[id];
-  }
-
-  /** \brief Get the names of all child and subchild bodies of this body */
-  const std::vector<std::string> getDescendantBodyNames() const {
-    std::vector<std::string> names;
-    auto descendants = getDescendantBodies();
-    for (auto descendant : descendants) {
-      names.push_back(descendant->getName());
-    }
-    return names;
-  }
-
-  /** \brief Get the child and subchild bodies of this body */
-  const std::vector<AttachedBody*> getDescendantBodies() const {
-    std::vector<AttachedBody*> descendants;
-    for (auto child : child_bodies_) {
-      auto grandchildren = child->getDescendantBodies();
-      descendants.insert(descendants.begin(), descendants.end(), grandchildren);
-    }
-    return descendants;
+    return child_bodies_.at(id);
   }
 
   /** \brief Get the shapes that make up this attached body */
