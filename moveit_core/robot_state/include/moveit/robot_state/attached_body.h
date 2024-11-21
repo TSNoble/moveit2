@@ -60,10 +60,14 @@ public:
   /** \brief Construct an attached body for a specified \e link.
    *
    * The name of this body is \e id and it consists of \e shapes that attach to the link by the transforms
-   * \e shape_poses. The set of links that are allowed to be touched by this object is specified by \e touch_links.
+   * \e shape_poses.
+   * 
+   * The set of links that are allowed to be touched by this object is specified by \e touch_links.
+   * 
    * detach_posture may describe a detach motion for the gripper when placing the object.
+   * 
    * The shape and subframe poses are relative to the \e pose, and \e pose is relative to the parent link. */
-  AttachedBody(const LinkModel* parent, const std::string& id, const Eigen::Isometry3d& pose,
+  AttachedBody(const LinkModel* parent, const std::string& name, const Eigen::Isometry3d& pose,
                const std::vector<shapes::ShapeConstPtr>& shapes, const EigenSTL::vector_Isometry3d& shape_poses,
                const std::set<std::string>& touch_links, const trajectory_msgs::msg::JointTrajectory& detach_posture,
                const moveit::core::FixedTransformsMap& subframe_poses = moveit::core::FixedTransformsMap());
@@ -72,152 +76,95 @@ public:
    *
    * The name of this body is \e id and it consists of \e shapes that attach to the link by the transforms
    * \e shape_poses.
+   *
+   * The body inherits its parent link, touch links and detach_posture from the root body in the hierarchy,
+   *
    * The shape and subframe poses are relative to the \e pose, and \e pose is relative to the parent body. */
-  AttachedBody(const AttachedBody* parent, const std::string& id, const Eigen::Isometry3d& pose,
+  AttachedBody(const AttachedBody* parent, const std::string& name, const Eigen::Isometry3d& pose,
                const std::vector<shapes::ShapeConstPtr>& shapes, const EigenSTL::vector_Isometry3d& shape_poses,
                const moveit::core::FixedTransformsMap& subframe_poses = moveit::core::FixedTransformsMap());
   
-  ~AttachedBody();
+  ~AttachedBody() = default;
 
   /** \brief Get the name of the attached body */
-  const std::string& getName() const
-  {
-    return id_;
-  }
+  const std::string& getName() const;
 
   /** \brief Get the pose of the attached body relative to the parent link */
-  const Eigen::Isometry3d& getPose() const
-  {
-    return pose_;
-  }
+  const Eigen::Isometry3d& getPose() const;
 
   /** \brief Get the pose of the attached body, relative to the world */
-  const Eigen::Isometry3d& getGlobalPose() const
-  {
-    return global_pose_;
-  }
+  const Eigen::Isometry3d& getGlobalPose() const;
 
   /** \brief Get the name of the link this body is attached to */
-  const std::string& getAttachedLinkName() const
-  {
-    return parent_link_model_->getName();
-  }
+  const std::string& getAttachedLinkName() const;
 
   /** \brief Get the model of the link this body is attached to */
-  const LinkModel* getAttachedLink() const
-  {
-    return parent_link_model_;
-  }
+  const LinkModel* getAttachedLink() const;
 
   /** \brief Get the name of the body that this body is attached to */
-  const std::string getParentBodyName() const
-  {
-    return parent_body_ ? parent_body_->getName() : "";
-  }
+  const std::string getParentBodyName() const;
 
   /** \brief Get the body that this body is attached to */
-  const AttachedBody* getParentBody() const
-  {
-    return parent_body_;
-  }
+  const AttachedBody* getParentBody() const;
 
   /** \brief Determines if this body is directly attached to a link */
-  bool isRootBody() const
-  {
-    return parent_body_ == nullptr;
-  }
+  bool isRootBody() const;
 
-  /** \brief Get the name of the body that is directly attached to a link */
-  const std::string getRootBodyName() const
-  {
-    return getRootBody()->getName();
-  }
+  /** \brief Get the name of body in the hierarchy that is directly attached to a link */
+  const std::string getRootBodyName() const;
 
-  /** \brief Get the body that is directly attached to a link */
-  const AttachedBody* getRootBody() const
-  {
-    auto body = this;
-    while(!(body->isRootBody())) {body = parent_body_; }
-    return body;
-  }
+  /** \brief Get the body in the hierarchy that is directly attached to a link */
+  const AttachedBody* getRootBody() const;
 
   /** \brief Get the names of all direct child bodies of this body */
-  const std::vector<std::string> getDirectChildBodyNames() const {
-    std::vector<std::string> names;
-    for (const auto& [name, _] : child_bodies_)
-    {
-      names.push_back(name);
-    }
-    return names;
-  }
+  const std::vector<std::string> getDirectChildBodyNames() const;
 
   /** \brief Get all direct child bodies of this body */
-  const std::vector<std::string, AttachedBody*> getDirectChildBodies() const;
+  const std::map<std::string, AttachedBody*> getDirectChildBodies() const;
 
-  /** \brief Get the direct child body of this body with name `id` */
-  const AttachedBody* getDirectChildBody(const std::string& id) const {
-    return child_bodies_.at(id);
-  }
+  /** \brief Get the direct child body of this body with name `name` */
+  const AttachedBody* getDirectChildBody(const std::string& name) const;
 
+  /** \brief Get the names of all direct and indirect child bodies of this body */
+  const std::vector<std::string> getDescendantBodyNames() const;
+
+  /** \brief Get all direct and indirect child bodies of this body */
+  const std::map<std::string, AttachedBody*> getDescendantBodies() const;
+
+  /** \brief Get the direct or indirect child body of this body with name `name` */
+  const AttachedBody* getDescendantBody(const std::string& name) const;
+  
   /** \brief Get the shapes that make up this attached body */
-  const std::vector<shapes::ShapeConstPtr>& getShapes() const
-  {
-    return shapes_;
-  }
+  const std::vector<shapes::ShapeConstPtr>& getShapes() const;
 
   /** \brief Get the shape poses (the transforms to the shapes of this body, relative to the pose). The returned
    *  transforms are guaranteed to be valid isometries. */
-  const EigenSTL::vector_Isometry3d& getShapePoses() const
-  {
-    return shape_poses_;
-  }
+  const EigenSTL::vector_Isometry3d& getShapePoses() const;
 
   /** \brief Get the links that the attached body is allowed to touch */
-  const std::set<std::string>& getTouchLinks() const
-  {
-    return touch_links_;
-  }
+  const std::set<std::string>& getTouchLinks() const;
 
   /** \brief Return the posture that is necessary for the object to be released, (if any). This is useful for example
      when storing the configuration of a gripper holding an object */
-  const trajectory_msgs::msg::JointTrajectory& getDetachPosture() const
-  {
-    return detach_posture_;
-  }
+  const trajectory_msgs::msg::JointTrajectory& getDetachPosture() const;
 
   /** \brief Get the fixed transforms (the transforms to the shapes of this body, relative to the link). The returned
    *  transforms are guaranteed to be valid isometries. */
-  const EigenSTL::vector_Isometry3d& getShapePosesInLinkFrame() const
-  {
-    return shape_poses_in_link_frame_;
-  }
+  const EigenSTL::vector_Isometry3d& getShapePosesInLinkFrame() const;
 
   /** \brief Get subframes of this object (relative to the object pose). The returned transforms are guaranteed to be
    * valid isometries. */
-  const moveit::core::FixedTransformsMap& getSubframes() const
-  {
-    return subframe_poses_;
-  }
+  const moveit::core::FixedTransformsMap& getSubframes() const;
 
   /** \brief Get subframes of this object (in the world frame) */
-  const moveit::core::FixedTransformsMap& getGlobalSubframeTransforms() const
-  {
-    return global_subframe_poses_;
-  }
+  const moveit::core::FixedTransformsMap& getGlobalSubframeTransforms() const;
 
   /** \brief Set all subframes of this object.
    *
    * Use these to define points of interest on the object to plan with
    * (e.g. screwdriver/tip, kettle/spout, mug/base).
    */
-  void setSubframeTransforms(const moveit::core::FixedTransformsMap& subframe_poses)
-  {
-    for (const auto& t : subframe_poses)
-    {
-      ASSERT_ISOMETRY(t.second)  // unsanitized input, could contain a non-isometry
-    }
-    subframe_poses_ = subframe_poses;
-  }
+  void setSubframeTransforms(const moveit::core::FixedTransformsMap& subframe_poses);
 
   /** \brief Get the fixed transform to a named subframe on this body (relative to the body's pose)
    *
@@ -247,10 +194,7 @@ public:
 
   /** \brief Get the global transforms (in world frame) for the collision bodies. The returned transforms are
    *  guaranteed to be valid isometries. */
-  const EigenSTL::vector_Isometry3d& getGlobalCollisionBodyTransforms() const
-  {
-    return global_collision_body_transforms_;
-  }
+  const EigenSTL::vector_Isometry3d& getGlobalCollisionBodyTransforms() const;
 
   /** \brief Set the padding for the shapes of this attached object */
   void setPadding(double padding);
@@ -273,8 +217,8 @@ private:
   /** \brief Any bodies which are attached directly to this body */
   std::map<std::string, AttachedBody*> child_bodies_;
 
-  /** \brief string id for reference */
-  std::string id_;
+  /** \brief string name for reference */
+  std::string name_;
 
   /** \brief The transform from the parent link to the attached body's pose*/
   Eigen::Isometry3d pose_;

@@ -32,7 +32,7 @@
  *  POSSIBILITY OF SUCH DAMAGE.
  *********************************************************************/
 
-/* Author: Ioan Sucan */
+/* Author: Ioan Sucan, Tom Noble */
 
 #include <moveit/robot_state/attached_body.h>
 #include <geometric_shapes/check_isometry.h>
@@ -42,14 +42,14 @@ namespace moveit
 {
 namespace core
 {
-AttachedBody::AttachedBody(const LinkModel* parent, const std::string& id, const Eigen::Isometry3d& pose,
+AttachedBody::AttachedBody(const LinkModel* parent, const std::string& name, const Eigen::Isometry3d& pose,
                            const std::vector<shapes::ShapeConstPtr>& shapes,
                            const EigenSTL::vector_Isometry3d& shape_poses, const std::set<std::string>& touch_links,
                            const trajectory_msgs::msg::JointTrajectory& detach_posture,
                            const FixedTransformsMap& subframe_poses)
   : parent_link_model_(parent)
   , parent_body_(nullptr)
-  , id_(id)
+  , name_(name)
   , pose_(pose)
   , shapes_(shapes)
   , shape_poses_(shape_poses)
@@ -82,13 +82,13 @@ AttachedBody::AttachedBody(const LinkModel* parent, const std::string& id, const
   }
 }
 
-AttachedBody::AttachedBody(const AttachedBody* parent, const std::string& id, const Eigen::Isometry3d& pose,
+AttachedBody::AttachedBody(const AttachedBody* parent, const std::string& name, const Eigen::Isometry3d& pose,
                            const std::vector<shapes::ShapeConstPtr>& shapes,
                            const EigenSTL::vector_Isometry3d& shape_poses,
                            const FixedTransformsMap& subframe_poses)
   : parent_link_model_(parent->getRootBody()->getAttachedLink())
   , parent_body_(parent)
-  , id_(id)
+  , name_(name)
   , pose_(pose)
   , shapes_(shapes)
   , shape_poses_(shape_poses)
@@ -121,43 +121,210 @@ AttachedBody::AttachedBody(const AttachedBody* parent, const std::string& id, co
   }
 }
 
-AttachedBody::~AttachedBody() = default;
+const std::string& AttachedBody::getName() const
+{
+  return name_;
+}
 
-  /** \brief Get the names of all direct child bodies of this body */
-  const std::vector<std::string> getDirectChildBodyNames() const {
-    std::vector<std::string> names;
-    for (const auto& [name, _] : child_bodies_)
-    {
-      names.push_back(name);
-    }
-    return names;
-  }
+const Eigen::Isometry3d& AttachedBody::getPose() const
+{
+  return pose_;
+}
 
-  /** \brief Get all direct child bodies of this body */
-  const std::vector<std::string, AttachedBody*> getDirectChildBodies() const
+const Eigen::Isometry3d& AttachedBody::getGlobalPose() const
+{
+  return global_pose_;
+}
+
+const std::string& AttachedBody::getAttachedLinkName() const
+{
+  return parent_link_model_->getName();
+}
+
+const LinkModel* AttachedBody::getAttachedLink() const
+{
+  return parent_link_model_;
+}
+
+const std::string AttachedBody::getParentBodyName() const
+{
+  return parent_body_ ? parent_body_->getName() : "";
+}
+
+const AttachedBody* AttachedBody::getParentBody() const
+{
+  return parent_body_;
+}
+
+bool AttachedBody::isRootBody() const
+{
+  return parent_body_ == nullptr;
+}
+
+const std::string AttachedBody::getRootBodyName() const
+{
+  return getRootBody()->getName();
+}
+
+const AttachedBody* AttachedBody::getRootBody() const
+{
+  auto body = this;
+  while(!(body->isRootBody())) {body = parent_body_; }
+  return body;
+}
+
+const std::vector<std::string> AttachedBody::getDirectChildBodyNames() const
+{
+  std::vector<std::string> names;
+  for (const auto& [name, _] : child_bodies_)
   {
-    return child_bodies_;
+    names.push_back(name);
   }
+  return names;
+}
 
-  // /** \brief Get the names of all child and subchild bodies of this body */
-  // const std::vector<std::string> getDescendantBodyNames() const {
-  //   std::vector<std::string> names;
-  //   auto descendants = getDescendantBodies();
-  //   for (auto descendant : descendants) {
-  //     names.push_back(descendant->getName());
-  //   }
-  //   return names;
-  // }
+const std::map<std::string, AttachedBody*> AttachedBody::getDirectChildBodies() const
+{
+  return child_bodies_;
+}
 
-  /** \brief Get the child and subchild bodies of this body */
-  const std::vector<AttachedBody*> AttachedBody::getDescendantBodies() const {
-    std::vector<AttachedBody*> descendants;
-    for (auto child : child_bodies_) {
-      auto grandchildren = child->getDescendantBodies();
-      descendants.insert(descendants.begin(), descendants.end(), grandchildren);
+const AttachedBody* AttachedBody::getDirectChildBody(const std::string& name) const
+{
+  return child_bodies_.at(name);
+}
+
+const std::vector<std::string> AttachedBody::getDescendantBodyNames() const 
+{
+  std::vector<std::string> names;
+  auto descendants = getDescendantBodies();
+  for (const auto& [name, _] : descendants) {
+    names.push_back(name);
+  }
+  return names;
+}
+
+const std::map<std::string, AttachedBody*> AttachedBody::getDescendantBodies() const
+{
+  std::map<std::string, AttachedBody*> descendants;
+  for (const auto& [name, child] : child_bodies_) {
+    descendants[getName() + ">" + name] = child;
+    auto subchildren = child->getDescendantBodies();
+    for (const auto& [subname, subchild]: subchildren) {
+      descendants[getName() + ">" + subname] = subchild;
     }
-    return descendants;
   }
+  return descendants;
+}
+
+const AttachedBody* AttachedBody::getDescendantBody(const std::string& name) const
+{
+  auto descendants = getDescendantBodies();
+  return descendants.at(name);
+}
+
+const std::vector<shapes::ShapeConstPtr>& AttachedBody::getShapes() const
+{
+  return shapes_;
+}
+
+const EigenSTL::vector_Isometry3d& AttachedBody::getShapePoses() const
+{
+  return shape_poses_;
+}
+
+const std::set<std::string>& AttachedBody::getTouchLinks() const
+{
+  return touch_links_;
+}
+
+const trajectory_msgs::msg::JointTrajectory& AttachedBody::getDetachPosture() const
+{
+  return detach_posture_;
+}
+
+const EigenSTL::vector_Isometry3d& AttachedBody::getShapePosesInLinkFrame() const
+{
+  return shape_poses_in_link_frame_;
+}
+
+const moveit::core::FixedTransformsMap& AttachedBody::getSubframes() const
+{
+  return subframe_poses_;
+}
+
+const moveit::core::FixedTransformsMap& AttachedBody::getGlobalSubframeTransforms() const
+{
+  return global_subframe_poses_;
+}
+
+void AttachedBody::setSubframeTransforms(const moveit::core::FixedTransformsMap& subframe_poses)
+{
+  for (const auto& t : subframe_poses)
+  {
+    ASSERT_ISOMETRY(t.second)  // unsanitized input, could contain a non-isometry
+  }
+  subframe_poses_ = subframe_poses;
+}
+
+const Eigen::Isometry3d& AttachedBody::getSubframeTransform(const std::string& frame_name, bool* found) const
+{
+  if (frame_name.rfind(name_, 0) == 0 && frame_name[name_.length()] == '/')
+  {
+    auto it = subframe_poses_.find(frame_name.substr(name_.length() + 1));
+    if (it != subframe_poses_.end())
+    {
+      if (found)
+        *found = true;
+      return it->second;
+    }
+  }
+  static const Eigen::Isometry3d IDENTITY_TRANSFORM = Eigen::Isometry3d::Identity();
+  if (found)
+    *found = false;
+  return IDENTITY_TRANSFORM;
+}
+
+const Eigen::Isometry3d& AttachedBody::getGlobalSubframeTransform(const std::string& frame_name, bool* found) const
+{
+  if (frame_name.rfind(name_, 0) == 0 && frame_name[name_.length()] == '/')
+  {
+    auto it = global_subframe_poses_.find(frame_name.substr(name_.length() + 1));
+    if (it != global_subframe_poses_.end())
+    {
+      if (found)
+        *found = true;
+      return it->second;
+    }
+  }
+  static const Eigen::Isometry3d IDENTITY_TRANSFORM = Eigen::Isometry3d::Identity();
+  if (found)
+    *found = false;
+  return IDENTITY_TRANSFORM;
+}
+
+const EigenSTL::vector_Isometry3d& AttachedBody::getGlobalCollisionBodyTransforms() const
+{
+  return global_collision_body_transforms_;
+}
+
+void AttachedBody::setPadding(double padding)
+{
+  for (shapes::ShapeConstPtr& shape : shapes_)
+  {
+    // if this shape is only owned here (and because this is a non-const function), we can safely const-cast:
+    if (shape.unique())
+    {
+      const_cast<shapes::Shape*>(shape.get())->padd(padding);
+    }
+    else
+    {
+      // if the shape is owned elsewhere, we make a copy:
+      shapes::Shape* copy = shape->clone();
+      copy->padd(padding);
+      shape.reset(copy);
+    }
+  }
+}
 
 void AttachedBody::setScale(double scale)
 {
@@ -191,61 +358,6 @@ void AttachedBody::computeTransform(const Eigen::Isometry3d& parent_link_global_
   for (auto global = global_subframe_poses_.begin(), end = global_subframe_poses_.end(), local = subframe_poses_.begin();
        global != end; ++global, ++local)
     global->second = global_pose_ * local->second;  // valid isometry
-}
-
-void AttachedBody::setPadding(double padding)
-{
-  for (shapes::ShapeConstPtr& shape : shapes_)
-  {
-    // if this shape is only owned here (and because this is a non-const function), we can safely const-cast:
-    if (shape.unique())
-    {
-      const_cast<shapes::Shape*>(shape.get())->padd(padding);
-    }
-    else
-    {
-      // if the shape is owned elsewhere, we make a copy:
-      shapes::Shape* copy = shape->clone();
-      copy->padd(padding);
-      shape.reset(copy);
-    }
-  }
-}
-
-const Eigen::Isometry3d& AttachedBody::getSubframeTransform(const std::string& frame_name, bool* found) const
-{
-  if (frame_name.rfind(id_, 0) == 0 && frame_name[id_.length()] == '/')
-  {
-    auto it = subframe_poses_.find(frame_name.substr(id_.length() + 1));
-    if (it != subframe_poses_.end())
-    {
-      if (found)
-        *found = true;
-      return it->second;
-    }
-  }
-  static const Eigen::Isometry3d IDENTITY_TRANSFORM = Eigen::Isometry3d::Identity();
-  if (found)
-    *found = false;
-  return IDENTITY_TRANSFORM;
-}
-
-const Eigen::Isometry3d& AttachedBody::getGlobalSubframeTransform(const std::string& frame_name, bool* found) const
-{
-  if (frame_name.rfind(id_, 0) == 0 && frame_name[id_.length()] == '/')
-  {
-    auto it = global_subframe_poses_.find(frame_name.substr(id_.length() + 1));
-    if (it != global_subframe_poses_.end())
-    {
-      if (found)
-        *found = true;
-      return it->second;
-    }
-  }
-  static const Eigen::Isometry3d IDENTITY_TRANSFORM = Eigen::Isometry3d::Identity();
-  if (found)
-    *found = false;
-  return IDENTITY_TRANSFORM;
 }
 
 bool AttachedBody::hasSubframeTransform(const std::string& frame_name) const
