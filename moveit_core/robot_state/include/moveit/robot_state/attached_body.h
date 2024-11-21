@@ -61,11 +61,11 @@ public:
    *
    * The name of this body is \e id and it consists of \e shapes that attach to the link by the transforms
    * \e shape_poses.
-   * 
+   *
    * The set of links that are allowed to be touched by this object is specified by \e touch_links.
-   * 
+   *
    * detach_posture may describe a detach motion for the gripper when placing the object.
-   * 
+   *
    * The shape and subframe poses are relative to the \e pose, and \e pose is relative to the parent link. */
   AttachedBody(const LinkModel* parent, const std::string& name, const Eigen::Isometry3d& pose,
                const std::vector<shapes::ShapeConstPtr>& shapes, const EigenSTL::vector_Isometry3d& shape_poses,
@@ -83,7 +83,7 @@ public:
   AttachedBody(const AttachedBody* parent, const std::string& name, const Eigen::Isometry3d& pose,
                const std::vector<shapes::ShapeConstPtr>& shapes, const EigenSTL::vector_Isometry3d& shape_poses,
                const moveit::core::FixedTransformsMap& subframe_poses = moveit::core::FixedTransformsMap());
-  
+
   ~AttachedBody() = default;
 
   /** \brief Get the name of the attached body */
@@ -133,7 +133,7 @@ public:
 
   /** \brief Get the direct or indirect child body of this body with name `name` */
   const AttachedBody* getDescendantBody(const std::string& name) const;
-  
+
   /** \brief Get the shapes that make up this attached body */
   const std::vector<shapes::ShapeConstPtr>& getShapes() const;
 

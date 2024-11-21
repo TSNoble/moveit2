@@ -33,8 +33,12 @@ if(BUILD_TESTING)
 
   ament_add_gtest(test_robot_state test/robot_state_test.cpp
                   APPEND_LIBRARY_DIRS "${APPEND_LIBRARY_DIRS}")
-
   target_link_libraries(test_robot_state moveit_test_utils moveit_utils
+                        moveit_exceptions moveit_robot_state)
+
+  ament_add_gtest(test_attached_body test/test_attached_body.cpp
+                  APPEND_LIBRARY_DIRS "${APPEND_LIBRARY_DIRS}")
+  target_link_libraries(test_attached_body moveit_test_utils moveit_utils
                         moveit_exceptions moveit_robot_state)
 
   ament_add_gtest(test_robot_state_complex test/test_kinematic_complex.cpp)

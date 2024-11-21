@@ -84,8 +84,7 @@ AttachedBody::AttachedBody(const LinkModel* parent, const std::string& name, con
 
 AttachedBody::AttachedBody(const AttachedBody* parent, const std::string& name, const Eigen::Isometry3d& pose,
                            const std::vector<shapes::ShapeConstPtr>& shapes,
-                           const EigenSTL::vector_Isometry3d& shape_poses,
-                           const FixedTransformsMap& subframe_poses)
+                           const EigenSTL::vector_Isometry3d& shape_poses, const FixedTransformsMap& subframe_poses)
   : parent_link_model_(parent->getRootBody()->getAttachedLink())
   , parent_body_(parent)
   , name_(name)
@@ -169,7 +168,10 @@ const std::string AttachedBody::getRootBodyName() const
 const AttachedBody* AttachedBody::getRootBody() const
 {
   auto body = this;
-  while(!(body->isRootBody())) {body = parent_body_; }
+  while (!(body->isRootBody()))
+  {
+    body = parent_body_;
+  }
   return body;
 }
 
@@ -193,11 +195,12 @@ const AttachedBody* AttachedBody::getDirectChildBody(const std::string& name) co
   return child_bodies_.at(name);
 }
 
-const std::vector<std::string> AttachedBody::getDescendantBodyNames() const 
+const std::vector<std::string> AttachedBody::getDescendantBodyNames() const
 {
   std::vector<std::string> names;
   auto descendants = getDescendantBodies();
-  for (const auto& [name, _] : descendants) {
+  for (const auto& [name, _] : descendants)
+  {
     names.push_back(name);
   }
   return names;
@@ -206,10 +209,12 @@ const std::vector<std::string> AttachedBody::getDescendantBodyNames() const
 const std::map<std::string, AttachedBody*> AttachedBody::getDescendantBodies() const
 {
   std::map<std::string, AttachedBody*> descendants;
-  for (const auto& [name, child] : child_bodies_) {
+  for (const auto& [name, child] : child_bodies_)
+  {
     descendants[getName() + ">" + name] = child;
     auto subchildren = child->getDescendantBodies();
-    for (const auto& [subname, subchild]: subchildren) {
+    for (const auto& [subname, subchild] : subchildren)
+    {
       descendants[getName() + ">" + subname] = subchild;
     }
   }
