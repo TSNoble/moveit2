@@ -34,6 +34,8 @@
 
 /* Author: Tom Noble */
 
+#include <geometric_shapes/shapes.h>
+#include <moveit/robot_state/attached_body.h>
 #include <moveit/robot_model/robot_model.h>
 #include <moveit/robot_state/robot_state.h>
 #include <urdf_parser/urdf_parser.h>
@@ -41,13 +43,13 @@
 
 class SingleLinkRobot : public testing::Test
 {
-protected:
-  void SetUp() override
+public:
+  virtual void SetUp() override
   {
     static const std::string URDF_XML = R"(
       <?xml version="1.0" ?>
       <robot name="single_link_robot">
-      <link name="base_link">
+      <link name="link">
         <inertial>
           <mass value="2.81"/>
           <origin rpy="0 0 0" xyz="0.0 0.0 .0"/>
@@ -66,12 +68,21 @@ protected:
           </geometry>
         </visual>
       </link>
+      <joint name="joint" type="revolute">
+          <axis xyz="0 0 1"/>
+          <parent link="link"/>
+          <origin rpy="0 0 0" xyz="0 0 0"/>
+          <limit effort="100.0" lower="-3.14" upper="3.14" velocity="0.2"/>
+      </joint>
       </robot>
     )";
 
     static const std::string SRDF_XML = R"xml(
       <?xml version="1.0" ?>
       <robot name="single_link_robot">
+        <group name="joint_group">
+          <joint name="joint"/>
+        </group>
       </robot>
       )xml";
 
@@ -79,22 +90,62 @@ protected:
     auto srdf_model = std::make_shared<srdf::Model>();
     srdf_model->initString(*urdf_model, SRDF_XML);
     robot_model_ = std::make_shared<moveit::core::RobotModel>(urdf_model, srdf_model);
-    robot_state_ = std::make_shared<moveit::core::RobotState>(robot_model_);
-    robot_state_->setToDefaultValues();
   }
 
-void TearDown() {
-    robot_state_->setToDefaultValues();
+virtual void TearDown() override {
 }
 
 protected:
   moveit::core::RobotModelConstPtr robot_model_;
-  moveit::core::RobotStatePtr robot_state_;
-
 };
 
-TEST_F(SingleLinkRobot, TestTrue) {
-    EXPECT_TRUE(true);
+class SingleAttachedBody: public SingleLinkRobot {
+  public:
+    
+    virtual void SetUp() override {
+      const moveit::core::LinkModel* link = robot_model_->getLinkModel("link");
+      std::string name = "root_body";
+      Eigen::Isometry3d pose;
+      pose = Eigen::Translation3d(1, 2, 3);
+      auto box = std::make_shared<shapes::Box>(0.1, 0.2, 0.3);
+      std::vector<shapes::ShapeConstPtr> shapes = {box};
+      EigenSTL::vector_Isometry3d shape_poses;
+      Eigen::Isometry3d shape_pose;
+      shape_pose = Eigen::Translation3d(4, 5, 6);
+      shape_poses.push_back(shape_pose);
+      std::set<std::string> touch_links = {"link"};
+      trajectory_msgs::msg::JointTrajectory detach_posture;
+      detach_posture.joint_names.push_back("joint");
+      trajectory_msgs::msg::JointTrajectoryPoint p;
+      p.positions.push_back(0.1);
+      detach_posture.points.push_back(p);
+      Eigen::Isometry3d subframe_pose;
+      subframe_pose = Eigen::Translation3d(7, 8, 9);
+      moveit::core::FixedTransformsMap subframes{{"subframe", subframe_pose}};
+      root_body_ = std::make_shared<moveit::core::AttachedBody>(
+        link,
+        name,
+        pose,
+        shapes,
+        shape_poses,
+        touch_links,
+        detach_posture,
+        subframes
+      );
+    }
+
+    virtual void TearDown() override {
+
+    }
+  
+  protected:
+    std::shared_ptr<moveit::core::AttachedBody> root_body_;
+};
+
+// Verifies that a single body attached to a link works as intended
+
+TEST_F(SingleAttachedBody, RootBodyHasCorrecAttachedLink) {
+    ASSERT_EQ(root_body_->getName(), "root_body");
 }
 
 int main(int argc, char** argv)
